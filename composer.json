@@ -1,0 +1,34 @@
+{
+    "name": "treconyl/images-upload",
+    "description": "A Package Images Upload",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "images_upload"
+    ],
+    "authors": [
+        {
+            "name": "treconyl",
+            "email": "treconyl@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^7.2|^8.0",
+        "intervention/image": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Treconyl\\ImageUpload\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Treconyl\\ImageUpload\\ImageUploadServiceProvider"
+            ]
+        }
+    }
+}
