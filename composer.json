@@ -1,22 +1,15 @@
 {
     "name": "treconyl/images-upload",
     "description": "A Package Images Upload",
-    "type": "library",
-    "license": "MIT",
-    "keywords": [
-        "images_upload"
-    ],
+    "keywords": ["images_upload","treconyl"],
     "authors": [
         {
             "name": "treconyl",
-            "email": "treconyl@gmail.com",
-            "role": "Developer"
+            "email": "treconyl@gmail.com"
         }
     ],
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "require": {
-        "php": "^7.2|^8.0",
+        "php": "^8.0",
         "intervention/image": "^2.0"
     },
     "autoload": {
@@ -30,5 +23,7 @@
                 "Treconyl\\ImageUpload\\ImageUploadServiceProvider"
             ]
         }
-    }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }

@@ -124,23 +124,28 @@ class ImageHelper
             return 'Unsupported image format';
         }
 
-        $image = Image::make($file)->resize($resize['width'], $resize['height'], function (Constraint $constraint) {
-            $constraint->aspectRatio();
-            $constraint->upsize(); #ngăn chặn tăng kích thước có thể xảy ra
-        });
-        if ($file->guessClientExtension() !== 'gif') :
-            $image->orientate();
-        endif;
-
-        #nếu có ảnh watermask
-        if (count($watermask) > 0) :
-            $image->insert($watermask);
-        endif;
-
-        $image->encode($checkExtension, $resize['quantity']);
-
-        #di chuyển tệp đã tải lên từ tạm thời sang thư mục tải lên
-        Storage::disk('public')->put($fullPath, (string) $image, 'public');
+        if ($file->guessClientExtension() == 'pdf'){
+            $name   = $filename . '.' . $checkExtension;
+            Storage::disk('public')->putFileAs($path, $file, $name);
+        } else {
+                $image = Image::make($file)->resize($resize['width'], $resize['height'], function (Constraint $constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize(); #ngăn chặn tăng kích thước có thể xảy ra
+            });
+            if ($file->guessClientExtension() !== 'gif') :
+                $image->orientate();
+            endif;
+    
+            #nếu có ảnh watermask
+            if (count($watermask) > 0) :
+                $image->insert($watermask);
+            endif;
+    
+            $image->encode($checkExtension, $resize['quantity']);
+    
+            #di chuyển tệp đã tải lên từ tạm thời sang thư mục tải lên
+            Storage::disk('public')->put($fullPath, (string) $image, 'public');
+        }
     }
     ## END
 
