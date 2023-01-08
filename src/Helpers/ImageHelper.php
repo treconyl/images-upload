@@ -109,6 +109,7 @@ class ImageHelper
         $resize             = $this->resize;
         $watermask          = $this->watermask;
         $filename_counter   = 1;
+        $allowed_mimetypes  = $this->allowed_mimetypes != null ? $this->allowed_mimetypes : config('image.allowed_mimetypes');
 
         # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
         $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
@@ -119,8 +120,10 @@ class ImageHelper
         $fullPath = $path . $filename . '.' . $checkExtension;
         # end
 
+        
+
         #check extenstion [jpg, png, git, jpeg ... ]
-        if (!in_array($file->guessClientExtension(), $this->allowed_mimetypes)) {
+        if (!in_array($file->guessClientExtension(), $allowed_mimetypes)) {
             return 'Unsupported image format';
         }
 

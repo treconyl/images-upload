@@ -1,7 +1,7 @@
 # Images Upload
 ## Bắt đầu
 ```
-php artisan vendor:publish --tag=config --force
+php artisan vendor:publish --provider="Treconyl\ImageUpload\ImageUploadServiceProvider" --tag=config
 ```
 
 
