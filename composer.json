@@ -2,16 +2,18 @@
     "name": "treconyl/images-upload",
     "description": "A Package Images Upload",
     "keywords": ["images_upload","treconyl"],
+    "license": "MIT",
     "authors": [
         {
             "name": "treconyl",
-            "email": "treconyl@gmail.com"
+            "email": "treconyl@gmail.com",
+            "homepage": "https://fondk.vn"
         }
     ],
     "require": {
         "php": "^8.0",
         "intervention/image": "^2.0"
-    },
+    },  
     "autoload": {
         "psr-4": {
             "Treconyl\\ImageUpload\\": "src/"

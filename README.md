@@ -1,6 +1,8 @@
 # Images Upload
 ## Bắt đầu
 ```
+composer require treconyl/images-upload
+
 php artisan vendor:publish --provider="Treconyl\ImageUpload\ImageUploadServiceProvider" --tag=config
 ```
 
