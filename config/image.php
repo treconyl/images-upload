@@ -55,23 +55,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Thêm các ảnh nhỏ hơn
+    | Thêm các ảnh nhỏ hơn, sắp xếp theo thứ tự cao đến thấp lg-md-sm-xs để không bị vỡ ảnh
     |--------------------------------------------------------------------------
     |  Supported: "resize", "fit", "crop"
     */
     "thumbnails" => [
-        "md" => [
-            "resize" => [
-                "width"   => 800,
-                "height"  => null
-            ]
-        ],
         "lg" => [
             "resize" => [
                 "width"   => 1600,
                 "height"  => null,
                 "upsize"  => true
             ]
+        ],
+        "md" => [
+            "resize" => [
+                "width"   => 800,
+                "height"  => null,
+                "upsize"  => true
+            ]
         ]
+        
     ]
 ];
