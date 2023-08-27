@@ -2,6 +2,7 @@
 
 namespace Treconyl\ImageUpload\Helpers;
 
+use Exception;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Facades\Image;
 use Intervention\Image\Constraint;
@@ -124,7 +125,7 @@ class ImageHelper
 
         #check extenstion [jpg, png, git, jpeg ... ]
         if (!in_array($file->guessClientExtension(), $allowed_mimetypes)) {
-            return 'Unsupported image format';
+            return new Exception('Unsupported image format');
         }
 
         if ($file->guessClientExtension() == 'pdf'){
@@ -159,10 +160,10 @@ class ImageHelper
             return false;
         }
 
-        $file               = $this->source;
+        $file = $this->source;
         
         if (is_array($file)) {
-            foreach ($file as $index => $item) {
+            foreach ($file as $item) {
                 $filename           = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME));
                 $this->loop_thumbnails($item, $path, $filename, $checkExtension);
             }
@@ -237,7 +238,7 @@ class ImageHelper
     ## Trả về url ảnh
     public function url($file, $folder)
     {
-        $path               = $folder . '/' . date('F') . date('Y') . '/';
+        $path = $folder . '/' . date('F') . date('Y') . '/';
 
         if (is_array($file)) {
 
@@ -288,8 +289,8 @@ class ImageHelper
     {
         $file       = $this->source;
         $path       = $folder . '/' . date('F') . date('Y') . '/';
+
         if (is_array($file)) {
-            
             $fullPath       = [];
 
             foreach ($file as $item) {
