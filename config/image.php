@@ -14,6 +14,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Folder đường dẫn folder lưu ảnh
+    |--------------------------------------------------------------------------
+    |
+    | Ex: April2020
+    |
+    */
+    'folder' => date('F') . date('Y'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Hỗ trợ định dạng file cho phép tải lên
     |--------------------------------------------------------------------------
     |
@@ -47,10 +57,10 @@ return [
     |  upsize: ngăn chặn tăng kích thước có thể xảy ra 
     */
     "resize" => [
-        "width"   => 500,
-        "height"  => null, // null chiều cao tự động
-        "quality" => 100,  // tất cả các ảnh tải lên sẽ được gán chất lượng
-        "upsize"  => true  // ngăn chặn tăng kích thước có thể xảy ra
+        "width"    => 1600, // null chiều rộng lớn nhất
+        "height"   => null, // null chiều cao tự động
+        "quanlity" => 100,  // tất cả các ảnh tải lên sẽ được gán chất lượng
+        "upsize"   => true  // ngăn chặn tăng kích thước có thể xảy ra
     ],
 
     /*

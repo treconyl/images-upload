@@ -9,15 +9,21 @@ use Intervention\Image\Constraint;
 
 class ImageHelper
 {
+    private $disk;
+    private $folder;
     private $source;
     private $resize;
     private $extension;
     private $thumbnails;
     private $watermask;
     private $allowed_mimetypes;
+    private $visibility;
 
     public function __construct()
     {
+        $this->disk         = 'public';
+        $this->visibility   = 'public';
+        $this->folder       = config('image.folder', date('F') . date('Y'));
         $this->resize       = config('image.resize');
         $this->extension    = '';
         $this->thumbnails   = [];
@@ -25,6 +31,29 @@ class ImageHelper
         $this->allowed_mimetypes = config('image.allowed_mimetypes');
     }
 
+    /**
+     * Tuỳ chỉnh ổ đĩa lưu trữ
+     */
+    public function disk(string $disk)
+    {
+        $this->disk = $disk;
+
+        return $this;
+    }
+
+    /**
+     * Khả năng hiển thị tệp
+     */
+    public function visibility(string $visibility = 'public')
+    {
+        $this->visibility = $visibility;
+
+        return $this;
+    }
+
+    /**
+     * Khả năng hiển thị tệp
+     */
     public function file($source, string $filename)
     {
         $this->source = $source->file($filename);
@@ -32,6 +61,25 @@ class ImageHelper
         return $this;
     }
 
+    /**
+     * Tùy chỉnh thư mục tải lên 
+     */
+    public function folder(string $folder, bool $folderDate = true)
+    {
+        $path = date('F') . date('Y');
+
+        if ($folderDate === true) {
+            $this->folder = $folder . '/' . $path;
+        } else {
+            $this->folder = $folder;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Tùy chỉnh hình thu nhỏ của ảnh
+     */
     public function thumbnails($thumbnails = [])
     {
         $this->thumbnails = count($thumbnails) > 0 ? $thumbnails : config('image.thumbnails');
@@ -39,6 +87,9 @@ class ImageHelper
         return $this;
     }
 
+    /**
+     * Tùy chỉnh định dạng lưu trữ
+     */
     public function extension($format = null)
     {
         $this->extension = $format;
@@ -46,8 +97,11 @@ class ImageHelper
         return $this;
     }
 
+    /**
+     * Tùy chỉnh tối ưu kích thước
+     */
     public function resize(
-        $width      = null,
+        $width      = 1600,
         $height     = null,
         $quantity   = null,
         $upsize     = null
@@ -60,6 +114,9 @@ class ImageHelper
         return $this;
     }
 
+    /**
+     * Gán ảnh mặt nạ tùy chỉnh
+     */
     public function watermask(
         $public_path  = 'watermask/default.png',
         $position     = 'bottom-left',
@@ -74,6 +131,9 @@ class ImageHelper
         return $this;
     }
 
+    /**
+     * Tùy chỉnh định dạng được cho phép
+     */
     public function allowed_mimetypes($mimetypes = [])
     {
         $this->allowed_mimetypes = $mimetypes;
@@ -82,45 +142,48 @@ class ImageHelper
     }
 
     ## START lưu ảnh và trả về url
-    public function store($folder = 'default')
+    public function store()
     {
-        $file               = $this->source;
-        $path               = $folder . '/' . date('F') . date('Y') . '/';
-        $checkExtension     = $this->extension != null ? $this->extension : $file->getClientOriginalExtension();
+        try {
+            $file      = $this->source;
+            $path      = $this->folder;
+            $extension = $this->extension ?? $file->getClientOriginalExtension();
 
-        #get url image
-        $url = $this->url($file, $folder);
+            #get url image
+            $url = $this->url($file, $path);
 
-        if (is_array($file)) {
-            foreach ($file as $key => $item) {
-                $this->save_disk($item, $path, $folder);
+            if (is_array($file)) {
+                foreach ($file as $item) {
+                    $this->save_disk($item, $path);
+                }
+            } else {
+                $this->save_disk($file, $path);
             }
-        } else {
-            $this->save_disk($file, $path, $folder);
+
+            #nếu thêm thumbnails (các hình thu nhỏ)
+            $this->resize_thumbnails($path, $extension);
+
+            return $url;
+        } catch (\Exception $exception) {
+            return $exception->getMessage();
         }
-
-        #nếu thêm thumbnails (các hình thu nhỏ)
-        $this->resize_thumbnails($path, $checkExtension);
-
-        return $url;
     }
-    public function save_disk($item, $path, $folder)
+    public function save_disk($file, $path)
     {
-        $file               = $item;
+        $storage            = Storage::disk($this->disk);
         $resize             = $this->resize;
         $watermask          = $this->watermask;
         $filename_counter   = 1;
         $allowed_mimetypes  = $this->allowed_mimetypes != null ? $this->allowed_mimetypes : config('image.allowed_mimetypes');
-
+        
         # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
         $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
         $checkExtension     = $this->extension != null ? $this->extension : $file->getClientOriginalExtension();
-        while (Storage::disk('public')->exists($path . $filename . '.' . $checkExtension)) :
+        while ($storage->exists($path  . '/' . $filename . '.' . $checkExtension)) :
             $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
         endwhile;
-        $fullPath = $path . $filename . '.' . $checkExtension;
+        $fullPath = $path . '/' . $filename . '.' . $checkExtension;
         # end
-
         
 
         #check extenstion [jpg, png, git, jpeg ... ]
@@ -130,31 +193,31 @@ class ImageHelper
 
         if ($file->guessClientExtension() == 'pdf'){
             $name   = $filename . '.' . $checkExtension;
-            Storage::disk('public')->putFileAs($path, $file, $name);
+            $storage->putFileAs($path, $file, $name);
         } else {
-                $image = Image::make($file)->resize($resize['width'], $resize['height'], function (Constraint $constraint) {
+            $image = Image::make($file)->resize($resize['width'], $resize['height'], function (Constraint $constraint) {
                 $constraint->aspectRatio();
                 $constraint->upsize(); #ngăn chặn tăng kích thước có thể xảy ra
             });
-            if ($file->guessClientExtension() !== 'gif') :
+            if ($file->guessClientExtension() !== 'gif'){
                 $image->orientate();
-            endif;
+            }
     
             #nếu có ảnh watermask
-            if (count($watermask) > 0) :
+            if (count($watermask) > 0) {
                 $image->insert($watermask);
-            endif;
+            }
     
             $image->encode($checkExtension, $resize['quantity']);
     
             #di chuyển tệp đã tải lên từ tạm thời sang thư mục tải lên
-            Storage::disk('public')->put($fullPath, (string) $image, 'public');
+            $storage->put($fullPath, (string) $image, $this->visibility);
         }
     }
     ## END
 
     ## START thêm các ảnh nhỏ hơn
-    public function resize_thumbnails($path, $checkExtension)
+    public function resize_thumbnails($path, $extension)
     {
         if (count($this->thumbnails) < 1) {
             return false;
@@ -165,21 +228,22 @@ class ImageHelper
         if (is_array($file)) {
             foreach ($file as $item) {
                 $filename           = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME));
-                $this->loop_thumbnails($item, $path, $filename, $checkExtension);
+                $this->loop_thumbnails($item, $path, $filename, $extension);
             }
         } else {
             $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
 
-            $this->loop_thumbnails($file, $path, $filename, $checkExtension);
+            $this->loop_thumbnails($file, $path, $filename, $extension);
         }
     }
-    public function loop_thumbnails($file, $path, $filename, $checkExtension)
+    public function loop_thumbnails($file, $path, $filename, $extension)
     {
-        $thumbnails         = $this->thumbnails;
-        $filename_counter   = 1;
+        $storage            = Storage::disk($this->disk);
         $image              = Image::make($file);
+        $thumbnails         = $this->thumbnails;
         $watermask          = $this->watermask;
         $resize             = $this->resize;
+        $filename_counter   = 1;
 
         #nếu có ảnh watermask
         if (count($watermask) > 0) :
@@ -188,7 +252,7 @@ class ImageHelper
 
         foreach ($thumbnails as $key => $value) {
             # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
-            while (Storage::disk('public')->exists($path . $filename . '-' . $key . '.' . $checkExtension)) {
+            while ($storage->exists($path . '/' . $filename . '-' . $key . '.' . $extension)) {
                 $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
             }
 
@@ -225,12 +289,12 @@ class ImageHelper
                 }
             }
 
-            $fullPathImage = $path . $filename . '-' . $key . '.' . $checkExtension;
+            $fullPathImage = $path . '/' . $filename . '-' . $key . '.' . $extension;
 
-            $image->encode($checkExtension, $resize['quantity']);
+            $image->encode($extension, $resize['quantity']);
 
             # di chuyển tệp đã tải lên từ tạm thời sang thư mục tải lên
-            Storage::disk('public')->put($fullPathImage, (string) $image, 'public');
+            $storage->put($fullPathImage, (string) $image, $this->visibility);
         }
     }
     ## END
@@ -238,87 +302,53 @@ class ImageHelper
     ## Trả về url ảnh
     public function url($file, $folder)
     {
-        $path = $folder . '/' . date('F') . date('Y') . '/';
+        $storage = Storage::disk($this->disk);
 
         if (is_array($file)) {
-
             $fullPath       = [];
 
             foreach ($file as $item) {
                 $filename           = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME));
                 $filename_counter   = 1;
-                $checkExtension     = $this->extension != null ? $this->extension : $item->getClientOriginalExtension();
+                $checkExtension     = $this->extension ?? $item->getClientOriginalExtension();
+                $path               = $folder . '/' . $filename . '.' . $checkExtension;
 
-                while (Storage::disk('public')->exists($path . $filename . '.' . $checkExtension)) {
-                    $filename = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+                while ($storage->exists($path)) {
+                    $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $checkExtension;
+                    $filename_counter++;
                 }
 
-                $fullPath[] .= $path . $filename . '.' . $checkExtension;
+                $fullPath[] .= $path;
             }
 
             return json_encode($fullPath);
-        } else {
+        }
 
-            $checkExtension     = $this->extension != null ? $this->extension : $file->getClientOriginalExtension();
+        if(!is_array($file)){
+            $checkExtension     = $this->extension ?? $file->getClientOriginalExtension();
             $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
             $filename_counter   = 1;
-
-            while (Storage::disk('public')->exists($path . $filename . '.' . $checkExtension)) {
-                $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+            $path               = $folder . '/' . $filename . '.' . $checkExtension;
+            
+            while ($storage->exists($path)) {
+                $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $checkExtension;
+                $filename_counter++;
             }
-
-            $fullPath = $path . $filename . '.' . $checkExtension;
-
-            return $fullPath;
+            
+            return $path;
         }
     }
 
     /**
+     * Lấy hình ảnh từ storage
      * @return string
      */
     function image($file, $default = '')
     {
-        if (!empty($file)) :
-            return str_replace('\\', '/', Storage::disk('public')->url($file));
-        endif;
+        if (!empty($file)) {
+            return str_replace('\\', '/', Storage::disk($this->disk)->url($file));
+        }
 
         return $default;
-    }
-
-    public function getPath($folder)
-    {
-        $file       = $this->source;
-        $path       = $folder . '/' . date('F') . date('Y') . '/';
-
-        if (is_array($file)) {
-            $fullPath       = [];
-
-            foreach ($file as $item) {
-                $filename           = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME));
-                $filename_counter   = 1;
-                $checkExtension     = $this->extension != null ? $this->extension : $item->getClientOriginalExtension();
-
-                while (Storage::disk('public')->exists($path . $filename . '.' . $checkExtension)) {
-                    $filename = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
-                }
-
-                $fullPath[] .= $path . $filename . '.' . $checkExtension;
-            }
-
-            return json_encode($fullPath);
-        } else {
-
-            $checkExtension     = $this->extension != null ? $this->extension : $file->getClientOriginalExtension();
-            $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
-            $filename_counter   = 1;
-
-            while (Storage::disk('public')->exists($path . $filename . '.' . $checkExtension)) {
-                $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
-            }
-
-            $fullPath = $path . $filename . '.' . $checkExtension;
-
-            return $fullPath;
-        }
     }
 }
