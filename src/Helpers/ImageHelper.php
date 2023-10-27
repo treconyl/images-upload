@@ -90,9 +90,9 @@ class ImageHelper
     /**
      * Tùy chỉnh định dạng lưu trữ
      */
-    public function extension($format = null)
+    public function extension($extension = null)
     {
-        $this->extension = $format;
+        $this->extension = $extension;
 
         return $this;
     }
@@ -174,29 +174,29 @@ class ImageHelper
     }
     public function save_disk($file, $path)
     {
+        $extension          = $this->extension != null ? $this->extension : $file->guessClientExtension();
         $storage            = Storage::disk($this->disk);
         $resize             = $this->resize;
         $watermask          = $this->watermask;
-        $filename_counter   = 1;
         $allowed_mimetypes  = $this->allowed_mimetypes != null ? $this->allowed_mimetypes : config('image.allowed_mimetypes');
-        
-        # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
-        $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
-        $checkExtension     = $this->extension != null ? $this->extension : $file->getClientOriginalExtension();
-        while ($storage->exists($path  . '/' . $filename . '.' . $checkExtension)) :
-            $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
-        endwhile;
-        $fullPath = $path . '/' . $filename . '.' . $checkExtension;
-        # end
-        
+        $filename_counter   = 1;
 
         #check extenstion [jpg, png, git, jpeg ... ]
         if (!in_array($file->guessClientExtension(), $allowed_mimetypes)) {
             return new Exception('Unsupported image format');
         }
+        
+        # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
+        $filename  = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
+        
+        while ($storage->exists($path  . '/' . $filename . '.' . $extension)) :
+            $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+        endwhile;
+        $fullPath = $path . '/' . $filename . '.' . $extension;
+        # end
 
         if ($file->guessClientExtension() == 'pdf'){
-            $name   = $filename . '.' . $checkExtension;
+            $name   = $filename . '.' . $extension;
             $storage->putFileAs($path, $file, $name);
         } else {
             $image = Image::make($file)->resize($resize['width'], $resize['height'], function (Constraint $constraint) {
@@ -212,7 +212,7 @@ class ImageHelper
                 $image->insert($watermask);
             }
     
-            $image->encode($checkExtension, $resize['quantity']);
+            $image->encode($extension, $resize['quantity']);
     
             #di chuyển tệp đã tải lên từ tạm thời sang thư mục tải lên
             $storage->put($fullPath, (string) $image, $this->visibility);
@@ -314,11 +314,11 @@ class ImageHelper
             foreach ($file as $item) {
                 $filename           = basename(pathinfo($item->getClientOriginalName(), PATHINFO_FILENAME));
                 $filename_counter   = 1;
-                $checkExtension     = $this->extension ?? $item->getClientOriginalExtension();
-                $path               = $folder . '/' . $filename . '.' . $checkExtension;
+                $extension          = $this->extension != null ? $this->extension : $file->guessClientExtension();
+                $path               = $folder . '/' . $filename . '.' . $extension;
 
                 while ($storage->exists($path)) {
-                    $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $checkExtension;
+                    $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
                     $filename_counter++;
                 }
 
@@ -329,13 +329,14 @@ class ImageHelper
         }
 
         if(!is_array($file)){
-            $checkExtension     = $this->extension ?? $file->getClientOriginalExtension();
+            $extension          = $this->extension != null ? $this->extension : $file->guessClientExtension();
+
             $filename           = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
             $filename_counter   = 1;
-            $path               = $folder . '/' . $filename . '.' . $checkExtension;
+            $path               = $folder . '/' . $filename . '.' . $extension;
             
             while ($storage->exists($path)) {
-                $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $checkExtension;
+                $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
                 $filename_counter++;
             }
             
