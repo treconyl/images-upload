@@ -149,6 +149,10 @@ class ImageHelper
             $path      = $this->folder;
             $extension = $this->extension ?? $file->getClientOriginalExtension();
 
+            if (!$file) {
+                return new Exception('No input received');
+            }
+
             #get url image
             $url = $this->url($file, $path);
 

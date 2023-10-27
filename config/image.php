@@ -59,7 +59,7 @@ return [
     "resize" => [
         "width"    => 1600, // null chiều rộng lớn nhất
         "height"   => null, // null chiều cao tự động
-        "quanlity" => 100,  // tất cả các ảnh tải lên sẽ được gán chất lượng
+        "quantity" => 100,  // tất cả các ảnh tải lên sẽ được gán chất lượng
         "upsize"   => true  // ngăn chặn tăng kích thước có thể xảy ra
     ],
 
