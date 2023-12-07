@@ -18,6 +18,7 @@ class ImageHelper
     private $watermask;
     private $allowed_mimetypes;
     private $visibility;
+    private $replace;
 
     public function __construct()
     {
@@ -29,6 +30,7 @@ class ImageHelper
         $this->thumbnails   = [];
         $this->watermask    = [];
         $this->allowed_mimetypes = config('image.allowed_mimetypes');
+        $this->replace      = false;
     }
 
     /**
@@ -54,9 +56,10 @@ class ImageHelper
     /**
      * Khả năng hiển thị tệp
      */
-    public function file($source, string $filename)
+    public function file($source, string $filename, bool $replace = false)
     {
         $this->source = $source->file($filename);
+        $this->replace = $replace;
 
         return $this;
     }
@@ -185,13 +188,17 @@ class ImageHelper
         if (!in_array($file->guessClientExtension(), $allowed_mimetypes)) {
             return new Exception('Unsupported image format');
         }
-        
+
         # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
         $filename  = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
-        
-        while ($storage->exists($path  . '/' . $filename . '.' . $extension)) :
-            $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
-        endwhile;
+
+        if ($this->replace == true && $storage->exists($path  . '/' . $filename . '.' . $extension)) {
+            $storage->delete($path  . '/' . $filename . '.' . $extension);
+        } else {
+            while ($storage->exists($path  . '/' . $filename . '.' . $extension)) :
+                $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+            endwhile;
+        }
         $fullPath = $path . '/' . $filename . '.' . $extension;
         # end
 
@@ -255,9 +262,13 @@ class ImageHelper
         endif;
 
         foreach ($thumbnails as $key => $value) {
-            # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
-            while ($storage->exists($path . '/' . $filename . '-' . $key . '.' . $extension)) {
-                $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+            if ($this->replace == true && $storage->exists($path  . '/' . $filename . '.' . $extension)) {
+                $storage->delete($path . '/' . $filename . '-' . $key . '.' . $extension);
+            } else {
+                # Đảm bảo rằng tên tệp không tồn tại, nếu có, hãy thêm một số vào cuối 1, 2, 3, v.v.
+                while ($storage->exists($path . '/' . $filename . '-' . $key . '.' . $extension)) {
+                    $filename = basename(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . (string) ($filename_counter++);
+                }
             }
 
             foreach ($value as $zip => $property) {
@@ -317,9 +328,13 @@ class ImageHelper
                 $extension          = $this->extension != null ? $this->extension : $file->guessClientExtension();
                 $path               = $folder . '/' . $filename . '.' . $extension;
 
-                while ($storage->exists($path)) {
-                    $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
-                    $filename_counter++;
+                if ($this->replace == true && $storage->exists($path  . '/' . $filename . '.' . $extension)) {
+                    $storage->delete($path  . '/' . $filename . '.' . $extension);
+                } else {
+                    while ($storage->exists($path)) {
+                        $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
+                        $filename_counter++;
+                    }
                 }
 
                 $fullPath[] .= $path;
@@ -335,9 +350,14 @@ class ImageHelper
             $filename_counter   = 1;
             $path               = $folder . '/' . $filename . '.' . $extension;
             
-            while ($storage->exists($path)) {
-                $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
-                $filename_counter++;
+            if ($this->replace == true && $storage->exists($path)) {
+                
+                $storage->delete($path);
+            } else {
+                while ($storage->exists($path)) {
+                    $path = $folder . '/' . $filename . (string) ($filename_counter) . '.' . $extension;
+                    $filename_counter++;
+                }
             }
             
             return $path;
