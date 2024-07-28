@@ -20,10 +20,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Treconyl\\ImageUpload\\ImagesUploadServiceProvider"
+                "Treconyl\\ImagesUpload\\ImagesUploadServiceProvider"
             ],
             "aliases": {
-                "ImageUpload": "Treconyl\\ImageUpload\\Facades\\ImageUpload"
+                "ImageUpload": "Treconyl\\ImagesUpload\\Facades\\ImageUpload"
             }
         }
     },
