@@ -190,8 +190,6 @@ class ImageUpload
                         $url,
                         (string) $thumbImage->encodeByExtension($this->convert ? $this->convert : $file->getClientOriginalExtension(), $this->quantity)
                     );
-
-                    $urls[] = Storage::url($url);
                 }
 
                 $urls[] = Storage::url($this->folder . '/' . $filename);
