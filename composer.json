@@ -2,6 +2,7 @@
     "name": "treconyl/images-upload",
     "description": "Gói Laravel hỗ trợ tải lên, nén và xử lý ảnh.",
     "type": "library",
+    "license": "MIT",
     "authors": [
         {
             "name": "treconyl",
