@@ -1,13 +1,31 @@
 {
     "name": "treconyl/images-upload",
     "description": "Gói Laravel hỗ trợ tải lên, nén và xử lý ảnh.",
+    "type": "library",
+    "authors": [
+        {
+            "name": "treconyl",
+            "email": "treconyl@gmail.com"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "Treconyl\\ImagesUpload\\": "src/"
         }
     },
     "require": {
+        "php": "^8.0",
         "intervention/image-laravel": "^1.3"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Treconyl\\ImageUpload\\ImagesUploadServiceProvider"
+            ],
+            "aliases": {
+                "ImageUpload": "Treconyl\\ImageUpload\\Facades\\ImageUpload"
+            }
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true
