@@ -1,30 +1,13 @@
 {
     "name": "treconyl/images-upload",
-    "description": "A Package Images Upload",
-    "keywords": ["images_upload","treconyl"],
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "treconyl",
-            "email": "treconyl@gmail.com",
-            "homepage": "https://fondk.vn"
-        }
-    ],
-    "require": {
-        "php": "^8.0",
-        "intervention/image": "^2.0"
-    },  
+    "description": "Gói Laravel hỗ trợ tải lên, nén và xử lý ảnh.",
     "autoload": {
         "psr-4": {
-            "Treconyl\\ImageUpload\\": "src/"
+            "Treconyl\\ImagesUpload\\": "src/"
         }
     },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Treconyl\\ImageUpload\\ImageUploadServiceProvider"
-            ]
-        }
+    "require": {
+        "intervention/image-laravel": "^1.3"
     },
     "minimum-stability": "stable",
     "prefer-stable": true
