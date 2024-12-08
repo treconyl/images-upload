@@ -37,11 +37,17 @@ trait Resizable
     {
         // Phân tích tên tệp và phần mở rộng
         $ext = pathinfo($image, PATHINFO_EXTENSION);
-
+    
         // Xóa phần mở rộng khỏi tên tệp gốc
         $name = Str::replaceLast('.' . $ext, '', $image);
-
-        // Hợp nhất thư mục loại hình thu nhỏ và tên tệp gốc
-        return $type . '/' . $name . '.' . $ext;
+    
+        // Tạo đường dẫn thư mục chứa hình thu nhỏ
+        $directory = dirname($name);
+    
+        // Lấy tên tệp mà không có thư mục
+        $basename = basename($name);
+    
+        // Hợp nhất thư mục, loại hình thu nhỏ, và tên tệp gốc
+        return $directory . '/' . $type . '/' . $basename . '.' . $ext;
     }
 }
