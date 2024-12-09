@@ -126,9 +126,10 @@ class ImageUpload
      * @param array $thumbnails Mảng chứa các kích thước thumbnail.
      * @return self Trả về đối tượng ImageUpload.
      */
-    public function thumbnails($thumbnails)
+    public function thumbnails($thumbnails = null)
     {
-        $this->thumbnails = $thumbnails;
+        // Lấy từ config nếu không có tham số
+        $this->thumbnails = $thumbnails ?: config('image-upload.resize', []);
         return $this;
     }
 
@@ -163,7 +164,7 @@ class ImageUpload
 
                 // Lưu tệp chính
                 Storage::disk($this->disk)->put(
-                    $this->folder . '/' . $filename,
+                    (string) $this->folder . '/' . $filename,
                     (string) $image
                 );
 
@@ -244,9 +245,9 @@ class ImageUpload
         
         if ($this->filename_encoding) {
             $name = Str::slug($name, '-');
-            $url = $this->folder . '/' . $thumbKey . '/' . $name . '.' . $extension;
+            $url = (string) $this->folder . '/' . $thumbKey . '/' . $name . '.' . $extension;
         } else {
-            $url = $this->folder . '/' . $name . '-' . $thumbKey . '.' . $extension;
+            $url = (string) $this->folder . '/' . $name . '-' . $thumbKey . '.' . $extension;
         }
 
         if ($this->overwrite) {
@@ -254,7 +255,6 @@ class ImageUpload
         }
 
         $count = 1;
-
         while (Storage::disk($this->disk)->exists($url)) {
             if ($this->filename_encoding) {
                 $url = $this->folder . '/' . $thumbKey . '/' . $name . '-' . $count++ . '.' . $extension;
