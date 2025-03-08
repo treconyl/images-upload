@@ -193,7 +193,7 @@ class ImageUpload
                     );
                 }
 
-                $urls[] = $this->folder . '/' . $filename;
+                $urls[] = Storage::url($this->folder . '/' . $filename);
             }
         } catch (Throwable $exception) {
             throw new Exception('Không thể tải lên ảnh: ' . $exception->getMessage());
