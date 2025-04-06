@@ -148,6 +148,22 @@ class ImageUpload
                 // Kiểm tra định dạng tệp trước khi xử lý
                 $this->validateFileMimetype($file);
 
+                $extension = strtolower($file->getClientOriginalExtension());
+                
+                // Nếu là file video/audio thì chỉ lưu vào thư mục, không xử lý bằng Intervention
+                if (in_array($extension, ['mp4', 'mov', 'avi', 'wmv', 'mkv', 'flv', 'mp3', 'wav', 'ogg', 'aac'])) {
+                    $filename = $this->generateFilename($file, $extension);
+
+                    Storage::disk($this->disk)->putFileAs(
+                        $this->folder,
+                        $file,
+                        $filename
+                    );
+
+                    $urls[] = '/storage/' . ltrim($this->folder . '/' . $filename, '/');
+                    continue;
+                }
+
                 $image = $manager->read($file->getPathname());
                 
                 // Chuyển đổi định dạng nếu cần
