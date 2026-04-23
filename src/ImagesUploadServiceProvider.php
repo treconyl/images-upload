@@ -1,29 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Treconyl\ImagesUpload;
 
 use Illuminate\Support\ServiceProvider;
 
 class ImagesUploadServiceProvider extends ServiceProvider
 {
-    public function register()
+    /**
+     * Đăng ký các dịch vụ và binding.
+     */
+    public function register(): void
     {
-        // Đăng ký các dịch vụ
-        $this->app->singleton('images-upload', function ($app) {
-            return new ImageUpload();
-        });
+        $this->mergeConfigFrom(__DIR__ . '/../config/image-upload.php', 'image-upload');
 
-        // Đăng ký facade
-        $this->app->bind('images-upload', function ($app) {
-            return new \Treconyl\ImagesUpload\Facades\ImageUpload;
-        });
+        $this->app->singleton('images-upload', fn () => new ImageUpload());
     }
 
-    public function boot()
+    /**
+     * Khởi động package (publish config).
+     */
+    public function boot(): void
     {
-        // Xuất tệp cấu hình
-        $this->publishes([
-            __DIR__ . '/../config/image-upload.php' => config_path('image-upload.php'),
-        ]);
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__ . '/../config/image-upload.php' => config_path('image-upload.php'),
+            ], 'image-upload-config');
+        }
     }
 }
