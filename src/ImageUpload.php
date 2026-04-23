@@ -1,234 +1,249 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Treconyl\ImagesUpload;
 
 use Exception;
 use Throwable;
-
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
-
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 
 class ImageUpload
 {
-    protected $file = [];
-    protected $filename_encoding = true;
-    protected $quantity;
-    protected $folder;
-    protected $disk;
-    protected $overwrite;
-    protected $convert = null;
-    protected $allowed_mimetypes;
-    protected $thumbnails = [];
+    /**
+     * Các định dạng media không xử lý qua Intervention, chỉ lưu trực tiếp.
+     */
+    protected const MEDIA_EXTENSIONS = [
+        'mp4', 'mov', 'avi', 'wmv', 'mkv', 'flv',
+        'mp3', 'wav', 'ogg', 'aac',
+    ];
+
+    /** @var array<int, UploadedFile> */
+    protected array $file = [];
+
+    protected bool $filename_encoding = true;
+    protected int $quantity = 100;
+    protected string $folder = 'default';
+    protected string $disk = 'public';
+    protected bool $overwrite = false;
+    protected ?string $convert = null;
+
+    /** @var array<int, string> */
+    protected array $allowed_mimetypes = [];
+
+    /** @var array<string, array<string, mixed>> */
+    protected array $thumbnails = [];
 
     public function __construct()
     {
-        $this->allowed_mimetypes = config('image-upload.allowed_mimetypes', []);
+        $this->allowed_mimetypes = (array) config('image-upload.allowed_mimetypes', []);
     }
 
     /**
      * Khởi tạo đối tượng ImageUpload với các tham số từ yêu cầu.
      *
-     * @param \Illuminate\Http\Request $request Yêu cầu HTTP chứa tệp tin tải lên.
-     * @param string $input Tên input chứa tệp tin tải lên.
-     * @param int $quantity Chất lượng ảnh khi lưu (mặc định là 100), chỉ áp dụng ['jpeg', 'jpg', 'webp'] còn PNG là định dạng ảnh không nén mất dữ liệu (lossless).
-     * @param bool $filename_encoding Mã hóa tên tệp hay không (mặc định là true) Ảnh đại diện.png => anh-dai-den.png.
-     * @param bool $overwrite Đè lên tệp nếu trùng tên hay không (mặc định là false).
+     * @param  Request  $request            Yêu cầu HTTP chứa tệp tin tải lên.
+     * @param  string   $input              Tên input chứa tệp tin tải lên.
+     * @param  int      $quantity           Chất lượng ảnh khi lưu (1-100). Chỉ áp dụng cho jpeg/jpg/webp.
+     * @param  bool     $filename_encoding  Mã hoá tên tệp dạng slug. Ảnh đại diện.png => anh-dai-dien.png.
+     * @param  bool     $overwrite          Ghi đè tệp nếu trùng tên.
      */
-    public static function file($request, $input, $quantity = 100, $filename_encoding = true, $overwrite = false)
-    {
-        $instance = new self();
-        
-        // Lấy tất cả file từ yêu cầu và đảm bảo là mảng
+    public static function file(
+        Request $request,
+        string $input,
+        int $quantity = 100,
+        bool $filename_encoding = true,
+        bool $overwrite = false
+    ): static {
+        $instance = new static();
+
         $files = $request->file($input);
-        $instance->file = is_array($files) ? $files : [$files];
-        // Thay đổi chất lượng ảnh khi lưu
+
+        $instance->file = match (true) {
+            $files === null => [],
+            is_array($files) => array_values($files),
+            default => [$files],
+        };
+
         $instance->quantity = $quantity;
-        // Đè lên tệp nếu trùng tên file
-        $instance->overwrite = $overwrite;
-        // Mã hóa tên tệp
         $instance->filename_encoding = $filename_encoding;
+        $instance->overwrite = $overwrite;
 
         return $instance;
     }
 
     /**
      * Đặt tên thư mục để lưu trữ tệp.
-     *
-     * @param string $name Tên thư mục (mặc định là 'default').
-     * @param bool $timestamp Nếu true, thêm dấu thời gian vào tên thư mục.
-     * @param string $disk Disk lưu trữ (mặc định là 'public').
      */
-    public function folder($name = 'default', $timestamp = true, $disk = 'public')
+    public function folder(string $name = 'default', bool $timestamp = true, string $disk = 'public'): static
     {
         $this->disk = $disk;
-    
-        $folderName = $name ?: 'default';
-    
-        $timestamp ? $this->folder = $folderName . '/' . date('F') . date('Y') : $this->folder = $folderName;
-    
+
+        $folderName = $name !== '' ? $name : 'default';
+
+        $this->folder = $timestamp
+            ? $folderName . '/' . date('FY')
+            : $folderName;
+
         return $this;
     }
 
     /**
-     * Thiết lập đuôi file lưu trữ.
-     *
-     * @param string|null $convert Chuyển đổi tệp ảnh sang định dạng khác
-     * @return self Trả về đối tượng ImageUpload.
+     * Chuyển đổi định dạng ảnh đầu ra (vd: 'webp').
      */
-    public function convert($convert = null)
+    public function convert(?string $convert = null): static
     {
         $this->convert = $convert;
-        
+
         return $this;
     }
 
     /**
-     * Đặt các loại MIME hợp lệ.
-     * Nếu mảng không được truyền vào hoặc mảng rỗng, sử dụng cấu hình mặc định.
+     * Đặt các loại MIME hợp lệ. Truyền mảng rỗng để dùng cấu hình mặc định.
      *
-     * @param array $types
-     * @return $this
+     * @param array<int, string> $types
      */
-    public function allowedMimetypes(array $types = [])
+    public function allowedMimetypes(array $types = []): static
     {
-        // Kiểm tra nếu $types là mảng không rỗng
-        if (!empty($types) && is_array($types)) {
-            $this->allowed_mimetypes = $types;
-        } else {
-            $this->allowed_mimetypes = cache('image-upload.allowed_mimetypes', []);
+        $this->allowed_mimetypes = ! empty($types)
+            ? $types
+            : (array) config('image-upload.allowed_mimetypes', []);
+
+        return $this;
+    }
+
+    /**
+     * Thiết lập các kích thước thumbnail. Không truyền sẽ lấy từ config.
+     *
+     * @param array<string, array<string, mixed>>|null $thumbnails
+     */
+    public function thumbnails(?array $thumbnails = null): static
+    {
+        $this->thumbnails = $thumbnails ?? (array) config('image-upload.thumbnails', []);
+
+        return $this;
+    }
+
+    /**
+     * Thực hiện lưu trữ file.
+     *
+     * @return string|array<int, string> URL hoặc danh sách URL nếu nhiều file.
+     *
+     * @throws Exception
+     */
+    public function store(): string|array
+    {
+        if (empty($this->file)) {
+            throw new Exception('Không có tệp nào để tải lên.');
         }
 
-        return $this;
-    }
-    
-    /**
-     * Kiểm tra định dạng tệp trước khi lưu.
-     *
-     * @param \Illuminate\Http\UploadedFile $file Tệp tải lên.
-     * @return void
-     * @throws Exception Nếu định dạng tệp không hợp lệ.
-     */
-    protected function validateFileMimetype($file)
-    {
-        $mimetype = $file->getClientOriginalExtension();
-        
-        if (!in_array($mimetype, $this->allowed_mimetypes)) {
-            throw new Exception("Loại tệp không hợp lệ: $mimetype. Các loại tệp được phép: " . implode(', ', $this->allowed_mimetypes));
-        }
-    }
-
-    /**
-     * Thiết lập các kích thước thumbnail.
-     *
-     * @param array $thumbnails Mảng chứa các kích thước thumbnail.
-     * @return self Trả về đối tượng ImageUpload.
-     */
-    public function thumbnails($thumbnails = null)
-    {
-        // Lấy từ config nếu không có tham số
-        $this->thumbnails = $thumbnails ?: config('image-upload.resize', []);
-        return $this;
-    }
-
-    /**
-     * Thực hiện việc lưu trữ file.
-     *
-     * @return array|string URL của file đã lưu hoặc mảng chứa URL nếu có nhiều file.
-     */
-    public function store()
-    {
         $urls = [];
         $manager = new ImageManager(new Driver());
 
         try {
             foreach ($this->file as $file) {
-                // Kiểm tra định dạng tệp trước khi xử lý
-                $this->validateFileMimetype($file);
-
-                $extension = strtolower($file->getClientOriginalExtension());
-                
-                // Nếu là file video/audio thì chỉ lưu vào thư mục, không xử lý bằng Intervention
-                if (in_array($extension, ['mp4', 'mov', 'avi', 'wmv', 'mkv', 'flv', 'mp3', 'wav', 'ogg', 'aac'])) {
-                    $filename = $this->generateFilename($file, $extension);
-
-                    Storage::disk($this->disk)->putFileAs(
-                        $this->folder,
-                        $file,
-                        $filename
-                    );
-
-                    $urls[] = '/storage/' . ltrim($this->folder . '/' . $filename, '/');
-                    continue;
-                }
-
-                $image = $manager->read($file->getPathname());
-                
-                // Chuyển đổi định dạng nếu cần
-                if ($this->convert) {
-                    $image = $image->encodeByExtension($this->convert, progressive: true, quality: $this->quantity);
-                    $extension = $this->convert;
-                } else {
-                    $image = $image->encodeByExtension($file->getClientOriginalExtension(), progressive: true, quality: $this->quantity);
-                    $extension = $file->getClientOriginalExtension();
-                }
-
-                // Tạo tên tệp với phần mở rộng thích hợp
-                $filename = $this->generateFilename($file, $extension);
-
-                // Lưu tệp chính
-                Storage::disk($this->disk)->put(
-                    (string) $this->folder . '/' . $filename,
-                    (string) $image
-                );
-
-                foreach ($this->thumbnails as $thumbKey => $thumbOptions) {
-                    $thumbImage = $manager->read($file->getPathname());
-                    
-                    // Áp dụng các tùy chọn resize cho thumbnail
-                    if (isset($thumbOptions['resize'])) {
-                        $width = $thumbOptions['resize']['width'] ?? null;
-                        $height = $thumbOptions['resize']['height'] ?? null;
-                        $upsize = $thumbOptions['resize']['upsize'] ?? false;
-                        
-                        if ($upsize) {
-                            $thumbImage->scaleDown($width, $height);
-                        } else {
-                            $thumbImage->scale($width, $height);
-                        }
-                    }
-
-                    $url = $this->generateThumbnailFilename($filename, $thumbKey, $extension);
-
-                    // Lưu tệp thumbnail
-                    Storage::disk($this->disk)->put(
-                        $url,
-                        (string) $thumbImage->encodeByExtension($this->convert ? $this->convert : $file->getClientOriginalExtension(), $this->quantity)
-                    );
-                }
-
-                $urls[] = '/storage/' . ltrim($this->folder . '/' . $filename, '/');
+                $urls[] = $this->storeOne($manager, $file);
             }
         } catch (Throwable $exception) {
-            throw new Exception('Không thể tải lên ảnh: ' . $exception->getMessage());
+            throw new Exception('Không thể tải lên ảnh: ' . $exception->getMessage(), 0, $exception);
         }
 
         return count($urls) > 1 ? $urls : $urls[0];
     }
 
     /**
-     * Tạo tên tệp duy nhất.
-     *
-     * @param \Illuminate\Http\UploadedFile $file Tệp tải lên.
-     * @param string $extension Phần mở rộng của tệp.
-     * @return string Tên tệp duy nhất.
+     * Xử lý và lưu một file.
      */
-    protected function generateFilename($file, $extension)
+    protected function storeOne(ImageManager $manager, UploadedFile $file): string
+    {
+        $this->validateFileExtension($file);
+
+        $originalExtension = strtolower($file->getClientOriginalExtension());
+
+        // File video/audio: chỉ lưu, không xử lý ảnh
+        if (in_array($originalExtension, self::MEDIA_EXTENSIONS, true)) {
+            $filename = $this->generateFilename($file, $originalExtension);
+
+            Storage::disk($this->disk)->putFileAs($this->folder, $file, $filename);
+
+            return '/storage/' . ltrim($this->folder . '/' . $filename, '/');
+        }
+
+        $extension = $this->convert ?? $originalExtension;
+        $encoded = $manager->read($file->getPathname())
+            ->encodeByExtension($extension, progressive: true, quality: $this->quantity);
+
+        $filename = $this->generateFilename($file, $extension);
+
+        Storage::disk($this->disk)->put($this->folder . '/' . $filename, (string) $encoded);
+
+        $this->generateThumbnails($manager, $file, $filename, $extension);
+
+        return '/storage/' . ltrim($this->folder . '/' . $filename, '/');
+    }
+
+    /**
+     * Tạo và lưu các thumbnail đã cấu hình.
+     */
+    protected function generateThumbnails(
+        ImageManager $manager,
+        UploadedFile $file,
+        string $filename,
+        string $extension
+    ): void {
+        foreach ($this->thumbnails as $thumbKey => $thumbOptions) {
+            $thumbImage = $manager->read($file->getPathname());
+
+            if (isset($thumbOptions['resize'])) {
+                $width = $thumbOptions['resize']['width'] ?? null;
+                $height = $thumbOptions['resize']['height'] ?? null;
+                $upsize = $thumbOptions['resize']['upsize'] ?? false;
+
+                $upsize
+                    ? $thumbImage->scaleDown($width, $height)
+                    : $thumbImage->scale($width, $height);
+            }
+
+            $url = $this->generateThumbnailFilename($filename, (string) $thumbKey, $extension);
+
+            Storage::disk($this->disk)->put(
+                $url,
+                (string) $thumbImage->encodeByExtension($extension, progressive: true, quality: $this->quantity),
+            );
+        }
+    }
+
+    /**
+     * Kiểm tra định dạng tệp dựa trên phần mở rộng.
+     *
+     * @throws Exception
+     */
+    protected function validateFileExtension(UploadedFile $file): void
+    {
+        $extension = strtolower($file->getClientOriginalExtension());
+        $allowed = array_map('strtolower', $this->allowed_mimetypes);
+
+        if (! in_array($extension, $allowed, true)) {
+            throw new Exception(sprintf(
+                'Loại tệp không hợp lệ: %s. Các loại tệp được phép: %s',
+                $extension,
+                implode(', ', $this->allowed_mimetypes),
+            ));
+        }
+    }
+
+    /**
+     * Tạo tên tệp duy nhất.
+     */
+    protected function generateFilename(UploadedFile $file, string $extension): string
     {
         $filename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        
+
         if ($this->filename_encoding) {
             $filename = Str::slug($filename, '-');
         }
@@ -239,7 +254,7 @@ class ImageUpload
 
         $originalFilename = $filename;
         $count = 1;
-        
+
         while (Storage::disk($this->disk)->exists($this->folder . '/' . $filename . '.' . $extension)) {
             $filename = $originalFilename . '-' . $count++;
         }
@@ -249,22 +264,20 @@ class ImageUpload
 
     /**
      * Tạo tên tệp cho thumbnail.
-     *
-     * @param string $filename Tên tệp gốc.
-     * @param string $thumbKey Key của thumbnail.
-     * @param string $extension Phần mở rộng của tệp.
-     * @return string Tên tệp thumbnail.
      */
-    protected function generateThumbnailFilename($filename, $thumbKey, $extension)
+    protected function generateThumbnailFilename(string $filename, string $thumbKey, string $extension): string
     {
         $name = pathinfo($filename, PATHINFO_FILENAME);
-        
+
         if ($this->filename_encoding) {
             $name = Str::slug($name, '-');
-            $url = (string) $this->folder . '/' . $thumbKey . '/' . $name . '.' . $extension;
-        } else {
-            $url = (string) $this->folder . '/' . $name . '-' . $thumbKey . '.' . $extension;
         }
+
+        $buildUrl = fn (int|string $suffix = ''): string => $this->filename_encoding
+            ? $this->folder . '/' . $thumbKey . '/' . $name . ($suffix !== '' ? '-' . $suffix : '') . '.' . $extension
+            : $this->folder . '/' . $name . '-' . $thumbKey . ($suffix !== '' ? '-' . $suffix : '') . '.' . $extension;
+
+        $url = $buildUrl();
 
         if ($this->overwrite) {
             return $url;
@@ -272,23 +285,9 @@ class ImageUpload
 
         $count = 1;
         while (Storage::disk($this->disk)->exists($url)) {
-            if ($this->filename_encoding) {
-                $url = $this->folder . '/' . $thumbKey . '/' . $name . '-' . $count++ . '.' . $extension;
-            } else {
-                $url = $this->folder . '/' . $name . '-' . $thumbKey . '-' . $count++ . '.' . $extension;
-            }
+            $url = $buildUrl($count++);
         }
-        
-        return $url;
-    }
 
-    /**
-     * Ghi thông tin đối tượng ra log.
-     *
-     * @return void
-     */
-    public function log()
-    {
-        return $this;
+        return $url;
     }
 }
